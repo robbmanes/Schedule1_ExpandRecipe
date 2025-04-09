@@ -17,7 +17,7 @@ namespace ExpandRecipe
 {
     public class Main : MelonMod
     {
-        public string testedVersion = "";
+        public string testedVersion = "0.3.3f15";
 
         public override void OnInitializeMelon()
         {
