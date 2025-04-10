@@ -205,25 +205,25 @@ namespace ExpandRecipe
                 return;
             }
 
+            // Get the recipe, base product, and reverse the tree
             try
             {
-                // Get the recipe, base product, and reverse the tree
                 Main.GetExpandedRecipe(baseRecipe, ref expandedRecipe, productManager, ref baseProduct);
+
+                // Recipe with no ingredients, bail
+                if (expandedRecipe.Count <= 0)
+                {
+                    return;
+                }
                 expandedRecipe.Reverse();
             } catch (Exception ex) {
                 MelonLogger.Error($"Exception raised getting recipe: {ex}");
                 return;
             }
 
+            // Actually update the UI
             try
             {
-                // We're a base product, we have no recipe and should not perform UI actions
-                if (expandedRecipe.Count <= 0)
-                {
-                    return;
-                }
-
-                // Actually update the UI
                 Main.BuildUIWithRecipe(baseRecipe.Product, expandedRecipe, baseProduct, recipesContainer.gameObject);
 
             } catch (Exception ex) {
