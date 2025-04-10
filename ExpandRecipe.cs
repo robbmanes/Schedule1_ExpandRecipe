@@ -13,7 +13,7 @@ using System.Linq.Expressions;
 using Il2CppSteamworks;
 using Il2CppScheduleOne.UI;
 
-[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.3", "Robb Manes", "nexusmods")]
+[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.3", "Robb Manes", "https://github.com/robbmanes/Schedule1_ExpandRecipe")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace ExpandRecipe
