@@ -11,7 +11,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Linq.Expressions;
 
-[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.0", "Robb Manes", "nexusmods")]
+[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.1", "Robb Manes", "nexusmods")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace ExpandRecipe
