@@ -11,7 +11,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Linq.Expressions;
 
-[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.1", "Robb Manes", "nexusmods")]
+[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.2.0", "Robb Manes", "nexusmods")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace ExpandRecipe
@@ -25,53 +25,94 @@ namespace ExpandRecipe
             MelonLogger.Msg($"Tested on Schedule I version \"{testedVersion}\"");
         }
 
-        public static void GetExpandedRecipe(StationRecipe baseRecipe, ref List<StationRecipe.IngredientQuantity> expandedRecipe, ProductManager productManager, ref StationRecipe.IngredientQuantity baseProduct)
+        public static bool DoesProductHaveRecipeWithItself(ProductDefinition product, out StationRecipe.IngredientQuantity baseIngredient) {
+			foreach(StationRecipe recipe in product.Recipes) {
+				foreach(StationRecipe.IngredientQuantity ingredient in recipe.Ingredients) {
+                    // Does recipe have the product as an ingredient?
+                    if(ingredient.Item.ID == recipe.Product.Item.ID) {
+						baseIngredient = ingredient;
+                        return true;
+					}
+				}
+			}
+
+            baseIngredient = null;
+			return false;
+		}
+
+		public static List<ExpandedRecipe> GetExpandedRecipes(Il2CppSystem.Collections.Generic.List<StationRecipe> baseRecipes, ProductManager productManager) {
+			List<ExpandedRecipe> expandedRecipes = [];
+
+			foreach(StationRecipe baseRecipe in baseRecipes) {
+				ExpandedRecipe baseExpandedRecipe = new ExpandedRecipe();
+				baseExpandedRecipe.finalProduct = baseRecipe.Product;
+
+				GetExpandedRecipes(baseRecipe, baseExpandedRecipe, ref expandedRecipes, productManager);
+			}
+
+            foreach(ExpandedRecipe expandedRecipe in expandedRecipes) {
+				expandedRecipe.addedIngredients.Reverse();
+			}
+
+            return expandedRecipes;
+		}
+
+		public static void GetExpandedRecipes(StationRecipe baseRecipe, ExpandedRecipe expandedRecipe, ref List<ExpandedRecipe> expandedRecipes, ProductManager productManager)
         {
-            foreach (StationRecipe.IngredientQuantity ingredient in baseRecipe.Ingredients)
+            // Sort ingredients so ingredients that are products get handled last
+            List<StationRecipe.IngredientQuantity> sortedIngredients = baseRecipe.Ingredients.ToArray().OrderByDescending(i => i.Item.Category).ToList();
+
+			for (int i= 0; i < sortedIngredients.Count; i++)
             {
                 // Our ingredient is a product, we need to go deeper
-                if (ingredient.Item.Category == EItemCategory.Product)
+                if(sortedIngredients[i].Item.Category == EItemCategory.Product)
                 {
-                    Func<ProductDefinition, bool> value = x => x.ID == ingredient.Item.ID;
-                    var product = productManager.AllProducts.Find(value) ?? throw new Exception($"Could not find base product for \"'{ingredient.Item.Name}'\"");
+                    Func<ProductDefinition, bool> value = x => x.ID == sortedIngredients[i].Item.ID;
+                    var product = productManager.AllProducts.Find(value) ?? throw new Exception($"Could not find base product for \"'{sortedIngredients[i].Item.Name}'\"");
 
                     if (product.Recipes.Count <= 0)
                     {
-                        // We're a product without a recipe, we must be the base
-                        baseProduct = ingredient;
-                        continue;
+						// We're a product without a recipe, we must be the base
+						expandedRecipe.baseProduct = sortedIngredients[i];
+
+						// Base product is the last thing to be added
+						if(i == sortedIngredients.Count - 1) {
+							expandedRecipes.Add(expandedRecipe);
+						}
+
+						continue;
                     }
 
                     // We need to peek a layer down to see if the next recipe's ingredient is ourself
                     // This stops infinite recursion when we hit the bottom
                     // Example: Grandaddy Purple = Grandaddy Purple + Flu Medicine
-                    foreach (StationRecipe nextRecipe in product.Recipes)
-                    {
-                        foreach (StationRecipe.IngredientQuantity i in nextRecipe.Ingredients)
-                        {
-                            // Did we hit bottom?
-                            if (i.Item.ID == ingredient.Item.ID)
-                            {
-                                // Yep, add the base ingredient/product and bail
-                                baseProduct = i;
-                                return;
-                            }
-                        }
-                    }
+                    if(DoesProductHaveRecipeWithItself(product, out StationRecipe.IngredientQuantity baseIngredient)) {
+						expandedRecipe.baseProduct = baseIngredient;
+
+						// Base product is the last thing to be added
+						if(i == sortedIngredients.Count - 1) {
+							expandedRecipes.Add(expandedRecipe);
+						}
+
+						continue;
+					}
+
                     // We'll recurse a ton if we go through every possible recipe for every product in the line,
                     // so we're going to blindly trust the first recipe in subsequent products.
                     // This means we don't show every possible combination but it's better than
                     // taking a year whenever you click on a product to show all combos.
-                    GetExpandedRecipe(product.Recipes[0], ref expandedRecipe, productManager, ref baseProduct);
+                    foreach(StationRecipe productRecipe in product.Recipes) {
+                        GetExpandedRecipes(productRecipe, expandedRecipe.Copy(), ref expandedRecipes, productManager);
+                    }
                 }
                 else
                 {
-                    expandedRecipe.Add(ingredient);
-                }
-            }
+                    expandedRecipe.addedIngredients.Add(sortedIngredients[i]);
+				}
+			}
         }
 
-        public static void BuildUIWithRecipe(StationRecipe.ItemQuantity finalProduct, List<StationRecipe.IngredientQuantity> expandedRecipe, StationRecipe.IngredientQuantity baseProduct, GameObject recipesContainerUI)
+        public static void BuildUIWithRecipe(ExpandedRecipe expandedRecipe, GameObject recipesContainerUI)
         {
             // Use these to clone instead of doing it by hand
             GameObject recipeToCloneUI = recipesContainerUI.transform.Find("Recipe").gameObject ?? throw new Exception("Unable to find recipeUI GameObject");
@@ -107,12 +148,12 @@ namespace ExpandRecipe
             }
 
             GameObject baseProductUI = GameObject.Instantiate(productToCloneUI, expandedRecipeUI.transform).gameObject;
-            baseProductUI.GetComponent<Image>().sprite = baseProduct.Item.Icon;
+            baseProductUI.GetComponent<Image>().sprite = expandedRecipe.baseProduct.Item.Icon;
             baseProductUI.GetComponent<Image>().preserveAspect = true;
-            baseProductUI.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = baseProduct.Item.name;
+            baseProductUI.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.baseProduct.Item.name;
 
-            int ingredientCount = expandedRecipe.Count - 1;
-            foreach (StationRecipe.IngredientQuantity ingredient in expandedRecipe)
+            int ingredientCount = expandedRecipe.addedIngredients.Count - 1;
+            foreach (StationRecipe.IngredientQuantity ingredient in expandedRecipe.addedIngredients)
             {
                 if (ingredientCount >= 0)
                 {
@@ -132,9 +173,9 @@ namespace ExpandRecipe
             arrowClone.GetComponent<Image>().preserveAspect = true;
 
             GameObject outputClone = GameObject.Instantiate(outputToCloneUI, expandedRecipeUI.transform).gameObject;
-            outputClone.GetComponent<Image>().sprite = finalProduct.Item.Icon;
+            outputClone.GetComponent<Image>().sprite = expandedRecipe.finalProduct.Item.Icon;
             outputClone.GetComponent<Image>().preserveAspect = true;
-            outputClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = finalProduct.Item.name;
+            outputClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.finalProduct.Item.name;
         }
     }
 
@@ -145,10 +186,9 @@ namespace ExpandRecipe
         public static void Prefix(ProductManagerApp __instance, ProductEntry entry)
         {
             ProductManager productManager;
-            StationRecipe baseRecipe;
+			Il2CppSystem.Collections.Generic.List<StationRecipe> baseRecipes;
             Transform recipesContainer;
-            List<StationRecipe.IngredientQuantity> expandedRecipe = new List<StationRecipe.IngredientQuantity> { };
-            StationRecipe.IngredientQuantity baseProduct = new StationRecipe.IngredientQuantity();
+            List<ExpandedRecipe> expandedRecipes;
 
             // Make sure we can find the ProductManager
             try
@@ -161,9 +201,9 @@ namespace ExpandRecipe
                 return;
             }
 
-            // Set up the Phone UI
-            // We have to do this early to clear existing ExpandedUI entries if they exist
-            try
+			// Set up the Phone UI
+			// We have to do this early to clear existing ExpandedUI entries if they exist
+			try
             {
                 var detailPanel = __instance.DetailPanel;
                 recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer");
@@ -191,7 +231,7 @@ namespace ExpandRecipe
             {
                 if (entry.Definition.Recipes.Count > 0)
                 {
-                    baseRecipe = entry.Definition.Recipes[0];
+					baseRecipes = entry.Definition.Recipes;
                 }
                 else
                 {
@@ -206,17 +246,25 @@ namespace ExpandRecipe
             }
 
             // Get the recipe, base product, and reverse the tree
-            try
-            {
-                Main.GetExpandedRecipe(baseRecipe, ref expandedRecipe, productManager, ref baseProduct);
+            try {
+				expandedRecipes = Main.GetExpandedRecipes(baseRecipes, productManager);
+
+				// We must be a base product, bail
+				if(expandedRecipes.Count == 0) {
+					return;
+				}
+
+                foreach (ExpandedRecipe expandedRecipe in expandedRecipes) {
+					MelonLogger.Msg(expandedRecipe.ToString());
+				}
 
                 // Recipe with no ingredients, bail
-                if (expandedRecipe.Count <= 0)
+                if(expandedRecipes[0].addedIngredients.Count <= 0)
                 {
                     return;
                 }
-                expandedRecipe.Reverse();
-            } catch (Exception ex) {
+
+			} catch (Exception ex) {
                 MelonLogger.Error($"Exception raised getting recipe: {ex}");
                 return;
             }
@@ -224,7 +272,7 @@ namespace ExpandRecipe
             // Actually update the UI
             try
             {
-                Main.BuildUIWithRecipe(baseRecipe.Product, expandedRecipe, baseProduct, recipesContainer.gameObject);
+                Main.BuildUIWithRecipe(expandedRecipes[0], recipesContainer.gameObject);
 
             } catch (Exception ex) {
                 MelonLogger.Error($"Exception raised building UI component: {ex}");
