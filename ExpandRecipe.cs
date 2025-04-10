@@ -9,6 +9,7 @@ using Object = UnityEngine.Object;
 using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Linq.Expressions;
 
 [assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.0", "Robb Manes", "nexusmods")]
 [assembly: MelonGame("TVGS", "Schedule I")]
@@ -87,13 +88,14 @@ namespace ExpandRecipe
             {
                 expandedRecipeUI = Object.Instantiate(recipeToCloneUI, recipesContainerUI.transform).gameObject ?? throw new Exception("Failed to instantiate new ExpandedRecipeUI");
                 expandedRecipeUI.name = "ExpandedRecipe";
-                expandedRecipeUI.active = true;
+                expandedRecipeUI.gameObject.SetActive(true);
                 expandedRecipeUI.gameObject.AddComponent<HorizontalLayoutGroup>();
                 expandedRecipeUI.transform.GetComponent<HorizontalLayoutGroup>().childScaleWidth = false;
             }
             else
             {
                 expandedRecipeUI = expandedRecipeUITransform.gameObject;
+                expandedRecipeUI.gameObject.SetActive(true);
             }
 
             // Always clear all children before using the recipe object
@@ -143,9 +145,28 @@ namespace ExpandRecipe
         public static void Prefix(ProductManagerApp __instance, ProductEntry entry)
         {
             ProductManager productManager;
-            var baseRecipe = entry.Definition.Recipes[0];
+            StationRecipe baseRecipe;
+            Transform recipesContainer;
             List<StationRecipe.IngredientQuantity> expandedRecipe = new List<StationRecipe.IngredientQuantity> { };
             StationRecipe.IngredientQuantity baseProduct = new StationRecipe.IngredientQuantity();
+
+            try
+            {
+                if (entry.Definition.Recipes.Count > 0)
+                {
+                    baseRecipe = entry.Definition.Recipes[0];
+                }
+                else
+                {
+                    // We must be a base product, bail
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to find base definition: {ex}");
+                return;
+            }
 
             try
             {
@@ -153,12 +174,43 @@ namespace ExpandRecipe
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"Failed to get productManager instance: {ex}");
+                MelonLogger.Error($"Failed to find base Product Manager: {ex}");
+                return;
+            }
+
+            // We have to do this early to clear existing ExpandedUI entries if they exist
+            try
+            {
+                // Set up the Phone UI
+                var detailPanel = __instance.DetailPanel;
+                recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer");
+                if (recipesContainer == null)
+                {
+                    MelonLogger.Error("Can't find RecipesContainer object in current scene");
+                    return;
+                }
+
+                Transform existingExpandedRecipeEntry = recipesContainer.Find("ExpandedRecipe");
+                if (existingExpandedRecipeEntry != null)
+                {
+                    // There's an existing entry - disable it
+                    existingExpandedRecipeEntry.gameObject.SetActive(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to find Phone UI components: {ex}");
                 return;
             }
 
             try
             {
+                // Check if we're a base product, if so, bail
+                if (baseRecipe.Ingredients.Count <= 0)
+                {
+                    return;
+                }
+
                 // Get the recipe, base product, and reverse the tree
                 Main.GetExpandedRecipe(baseRecipe, ref expandedRecipe, productManager, ref baseProduct);
                 expandedRecipe.Reverse();
@@ -169,18 +221,14 @@ namespace ExpandRecipe
 
             try
             {
-                // Set up the Phone UI
-                var detailPanel = __instance.DetailPanel;
-                GameObject recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer").gameObject;
-                if (recipesContainer == null)
+                // We're a base product, we have no recipe and should not perform UI actions
+                if (expandedRecipe.Count <= 0)
                 {
-                    MelonLogger.Error("Can't find RecipesContainer object in current scene");
                     return;
                 }
-                else
-                {
-                    Main.BuildUIWithRecipe(baseRecipe.Product, expandedRecipe, baseProduct, recipesContainer.gameObject);
-                }
+
+                // Actually update the UI
+                Main.BuildUIWithRecipe(baseRecipe.Product, expandedRecipe, baseProduct, recipesContainer.gameObject);
 
             } catch (Exception ex) {
                 MelonLogger.Error($"Exception raised building UI component: {ex}");
