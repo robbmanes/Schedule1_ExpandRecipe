@@ -1,6 +1,5 @@
 # ExpandRecipe - Schedule 1
 A Product Manager recipe expansion mod for the game [Schedule 1](https://store.steampowered.com/app/3164500/Schedule_I/).
-Version `0.1.0` - Currently tested against `0.3.3f15`
 
 ## About
 When using the Product Manager App on your phone, instead of having to click on each product in succession to determine what mixers you need, this mod expands all of them at once including the base product you need (type of weed, meth, cocaine, etc).
