@@ -150,24 +150,7 @@ namespace ExpandRecipe
             List<StationRecipe.IngredientQuantity> expandedRecipe = new List<StationRecipe.IngredientQuantity> { };
             StationRecipe.IngredientQuantity baseProduct = new StationRecipe.IngredientQuantity();
 
-            try
-            {
-                if (entry.Definition.Recipes.Count > 0)
-                {
-                    baseRecipe = entry.Definition.Recipes[0];
-                }
-                else
-                {
-                    // We must be a base product, bail
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"Failed to find base definition: {ex}");
-                return;
-            }
-
+            // Make sure we can find the ProductManager
             try
             {
                 productManager = Object.FindObjectsOfType<ProductManager>()[0];
@@ -178,10 +161,10 @@ namespace ExpandRecipe
                 return;
             }
 
+            // Set up the Phone UI
             // We have to do this early to clear existing ExpandedUI entries if they exist
             try
             {
-                // Set up the Phone UI
                 var detailPanel = __instance.DetailPanel;
                 recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer");
                 if (recipesContainer == null)
@@ -203,14 +186,27 @@ namespace ExpandRecipe
                 return;
             }
 
+            // Fill the base recipe or determine if we're the base product
             try
             {
-                // Check if we're a base product, if so, bail
-                if (baseRecipe.Ingredients.Count <= 0)
+                if (entry.Definition.Recipes.Count > 0)
                 {
+                    baseRecipe = entry.Definition.Recipes[0];
+                }
+                else
+                {
+                    // We must be a base product, bail
                     return;
                 }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to find base definition: {ex}");
+                return;
+            }
 
+            try
+            {
                 // Get the recipe, base product, and reverse the tree
                 Main.GetExpandedRecipe(baseRecipe, ref expandedRecipe, productManager, ref baseProduct);
                 expandedRecipe.Reverse();
