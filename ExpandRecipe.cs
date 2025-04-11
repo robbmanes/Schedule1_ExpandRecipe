@@ -1,15 +1,17 @@
-﻿using System.Collections;
-using ExpandRecipe;
-using MelonLoader;
-using Il2CppScheduleOne.UI.Phone.ProductManagerApp;
+﻿using ExpandRecipe;
+using Il2CppScheduleOne.ItemFramework;
 using Il2CppScheduleOne.Product;
 using Il2CppScheduleOne.StationFramework;
-using Il2CppScheduleOne.ItemFramework;
-using Object = UnityEngine.Object;
-using HarmonyPatch = HarmonyLib.HarmonyPatch;
+using Il2CppScheduleOne.UI.Phone.ProductManagerApp;
+using MelonLoader;
+using System.Collections;
+using System.Linq.Expressions;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq.Expressions;
+using static Il2CppRootMotion.FinalIK.RagdollUtility;
+using static Il2CppScheduleOne.AvatarFramework.Equipping.AvatarEquippable;
+using HarmonyPatch = HarmonyLib.HarmonyPatch;
+using Object = UnityEngine.Object;
 
 [assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.2.0", "Robb Manes", "nexusmods")]
 [assembly: MelonGame("TVGS", "Schedule I")]
@@ -110,9 +112,107 @@ namespace ExpandRecipe
                     expandedRecipe.addedIngredients.Add(sortedIngredients[i]);
 				}
 			}
-        }
+		}
 
-        public static void BuildUIWithRecipe(ExpandedRecipe expandedRecipe, GameObject recipesContainerUI)
+		public static GameObject CreateExpandedRecipesTextUIGO(GameObject gameObjectToClone, GameObject parentGameObject) {
+			GameObject expandedRecipesTextUI;
+			Transform expandedRecipesTextUITransform = parentGameObject.transform.Find("ExpandedRecipesText");
+            if(expandedRecipesTextUITransform == null) {
+				expandedRecipesTextUI = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+				expandedRecipesTextUI.name = "ExpandedRecipesText";
+				expandedRecipesTextUI.GetComponent<Text>().text = "Expanded Recipe(s)";
+			} else {
+				expandedRecipesTextUI = expandedRecipesTextUITransform.gameObject;
+			}
+
+			expandedRecipesTextUI.gameObject.SetActive(true);
+
+			return expandedRecipesTextUI;
+		}
+
+		public static GameObject GetOrCreateExpandedRecipesUIGO(GameObject parentGameObject) {
+			GameObject expandedRecipesUI;
+			Transform expandedRecipeUITransform = parentGameObject.transform.Find("ExpandedRecipes");
+			if(expandedRecipeUITransform == null) {
+                expandedRecipesUI = GameObject.Instantiate(new GameObject(), parentGameObject.transform).gameObject;
+				expandedRecipesUI.name = "ExpandedRecipes";
+
+				VerticalLayoutGroup verticalLayoutGroup = expandedRecipesUI.gameObject.AddComponent<VerticalLayoutGroup>();
+                verticalLayoutGroup.spacing = 8;
+				verticalLayoutGroup.childScaleHeight = false;
+				verticalLayoutGroup.childScaleWidth = false;
+				verticalLayoutGroup.childControlHeight = false;
+				verticalLayoutGroup.childControlWidth = false;
+				verticalLayoutGroup.childForceExpandHeight = false;
+				verticalLayoutGroup.childForceExpandWidth = false;
+			} else {
+				expandedRecipesUI = expandedRecipeUITransform.gameObject;
+
+				// Clear existing recipes
+				expandedRecipesUI.DestroyChildren();
+			}
+
+			expandedRecipesUI.gameObject.SetActive(true);
+
+			return expandedRecipesUI;
+		}
+
+        public static GameObject CreateExpandedRecipeUIGO(GameObject gameObjectToClone, GameObject parentGameObject) {
+			GameObject expandedRecipeUI = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			expandedRecipeUI.gameObject.SetActive(true);
+
+			HorizontalLayoutGroup horizontalLayoutGroup = expandedRecipeUI.gameObject.AddComponent<HorizontalLayoutGroup>();
+            horizontalLayoutGroup.childAlignment = TextAnchor.MiddleCenter;
+			horizontalLayoutGroup.childScaleHeight = false;
+			horizontalLayoutGroup.childScaleWidth = false;
+			horizontalLayoutGroup.childControlHeight = false;
+			horizontalLayoutGroup.childControlWidth = false;
+			horizontalLayoutGroup.childForceExpandHeight = false;
+			horizontalLayoutGroup.childForceExpandWidth = true;
+
+			// Clear cloned recipe
+			expandedRecipeUI.DestroyChildren();
+
+			return expandedRecipeUI;
+		}
+
+		public static GameObject CreateBaseProductUIGO(GameObject gameObjectToClone, GameObject parentGameObject, ExpandedRecipe expandedRecipe) {
+			GameObject baseProductUI = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			baseProductUI.GetComponent<Image>().sprite = expandedRecipe.baseProduct.Item.Icon;
+			baseProductUI.GetComponent<Image>().preserveAspect = true;
+			baseProductUI.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.baseProduct.Item.name;
+            return baseProductUI;
+		}
+
+        public static GameObject CreatePlusUIGO(GameObject gameObjectToClone, GameObject parentGameObject) {
+			GameObject plusClone = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			plusClone.GetComponent<Image>().preserveAspect = true;
+            return plusClone;
+		}
+
+        public static GameObject CreateMixUIGO(GameObject gameObjectToClone, GameObject parentGameObject, StationRecipe.IngredientQuantity ingredient) {
+			GameObject mixClone = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			mixClone.GetComponent<Image>().sprite = ingredient.Item.Icon;
+			mixClone.GetComponent<Image>().preserveAspect = true;
+			mixClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = ingredient.Item.name;
+            return mixClone;
+		}
+
+        public static GameObject CreateArrowUIGO(GameObject gameObjectToClone, GameObject parentGameObject) {
+			GameObject arrowClone = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			arrowClone.GetComponent<Image>().preserveAspect = true;
+            return arrowClone;
+		}
+
+        public static GameObject CreateOutputUIGO(GameObject gameObjectToClone, GameObject parentGameObject, ExpandedRecipe expandedRecipe) {
+			GameObject outputClone = GameObject.Instantiate(gameObjectToClone, parentGameObject.transform).gameObject;
+			outputClone.GetComponent<Image>().sprite = expandedRecipe.finalProduct.Item.Icon;
+			outputClone.GetComponent<Image>().preserveAspect = true;
+			outputClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.finalProduct.Item.name;
+            return outputClone;
+		}
+
+        public static void BuildUIWithRecipe(List<ExpandedRecipe> expandedRecipes, GameObject recipeTextUI, GameObject recipesContainerUI)
         {
             // Use these to clone instead of doing it by hand
             GameObject recipeToCloneUI = recipesContainerUI.transform.Find("Recipe").gameObject ?? throw new Exception("Unable to find recipeUI GameObject");
@@ -122,61 +222,31 @@ namespace ExpandRecipe
             GameObject arrowToCloneUI = recipeToCloneUI.transform.Find("Arrow").gameObject ?? throw new Exception("Unable to find arrowUI GameObject");
             GameObject outputToCloneUI = recipeToCloneUI.transform.Find("Output").gameObject ?? throw new Exception("Unable to find outputUI GameObject");
 
-            // The recipesContainer rect holds 20 default recipes, and we need to add/manage just our own
-            GameObject expandedRecipeUI;
-            Transform expandedRecipeUITransform = recipesContainerUI.transform.Find("ExpandedRecipe");
-            if (expandedRecipeUITransform == null)
-            {
-                expandedRecipeUI = Object.Instantiate(recipeToCloneUI, recipesContainerUI.transform).gameObject ?? throw new Exception("Failed to instantiate new ExpandedRecipeUI");
-                expandedRecipeUI.name = "ExpandedRecipe";
-                expandedRecipeUI.gameObject.SetActive(true);
-                expandedRecipeUI.gameObject.AddComponent<HorizontalLayoutGroup>();
-                expandedRecipeUI.transform.GetComponent<HorizontalLayoutGroup>().childScaleWidth = false;
-            }
-            else
-            {
-                expandedRecipeUI = expandedRecipeUITransform.gameObject;
-                expandedRecipeUI.gameObject.SetActive(true);
-            }
+			CreateExpandedRecipesTextUIGO(recipeTextUI, recipesContainerUI);
 
-            // Always clear all children before using the recipe object
-            int childCount = expandedRecipeUI.transform.GetChildCount();
-            for (int i = childCount - 1; i >= 0; i--)
-            {
-                var child = expandedRecipeUI.transform.GetChild(i);
-                GameObject.Destroy(child.gameObject);
-            }
+			// The recipesContainer rect holds 20 default recipes, and we need to add/manage just our own
+			GameObject expandedRecipesUI = GetOrCreateExpandedRecipesUIGO(recipesContainerUI);
 
-            GameObject baseProductUI = GameObject.Instantiate(productToCloneUI, expandedRecipeUI.transform).gameObject;
-            baseProductUI.GetComponent<Image>().sprite = expandedRecipe.baseProduct.Item.Icon;
-            baseProductUI.GetComponent<Image>().preserveAspect = true;
-            baseProductUI.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.baseProduct.Item.name;
+			foreach(ExpandedRecipe expandedRecipe in expandedRecipes) {
+				GameObject expandedRecipeUI = CreateExpandedRecipeUIGO(recipeToCloneUI, expandedRecipesUI);
 
-            int ingredientCount = expandedRecipe.addedIngredients.Count - 1;
-            foreach (StationRecipe.IngredientQuantity ingredient in expandedRecipe.addedIngredients)
-            {
-                if (ingredientCount >= 0)
-                {
-                    GameObject plusClone = GameObject.Instantiate(plusToCloneUI, expandedRecipeUI.transform).gameObject;
-                    plusClone.GetComponent<Image>().preserveAspect = true;
-                }
+				CreateBaseProductUIGO(productToCloneUI, expandedRecipeUI, expandedRecipe);
 
-                GameObject mixClone = GameObject.Instantiate(mixerToCloneUI, expandedRecipeUI.transform).gameObject;
-                mixClone.GetComponent<Image>().sprite = ingredient.Item.Icon;
-                mixClone.GetComponent<Image>().preserveAspect = true;
-                mixClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = ingredient.Item.name;
+				int ingredientCount = expandedRecipe.addedIngredients.Count - 1;
+				foreach(StationRecipe.IngredientQuantity ingredient in expandedRecipe.addedIngredients) {
+					if(ingredientCount >= 0) {
+						CreatePlusUIGO(plusToCloneUI, expandedRecipeUI);
+					}
 
-                ingredientCount--;
-            }
+					CreateMixUIGO(mixerToCloneUI, expandedRecipeUI, ingredient);
 
-            GameObject arrowClone = GameObject.Instantiate(arrowToCloneUI, expandedRecipeUI.transform).gameObject;
-            arrowClone.GetComponent<Image>().preserveAspect = true;
+					ingredientCount--;
+				}
 
-            GameObject outputClone = GameObject.Instantiate(outputToCloneUI, expandedRecipeUI.transform).gameObject;
-            outputClone.GetComponent<Image>().sprite = expandedRecipe.finalProduct.Item.Icon;
-            outputClone.GetComponent<Image>().preserveAspect = true;
-            outputClone.GetComponent<Il2CppScheduleOne.UI.Tooltips.Tooltip>().text = expandedRecipe.finalProduct.Item.name;
-        }
+				CreateArrowUIGO(arrowToCloneUI, expandedRecipeUI);
+				CreateOutputUIGO(outputToCloneUI, expandedRecipeUI, expandedRecipe);
+			}
+		}
     }
 
     // Patch the products selected in the ProductManagerApp
@@ -187,6 +257,7 @@ namespace ExpandRecipe
         {
             ProductManager productManager;
 			Il2CppSystem.Collections.Generic.List<StationRecipe> baseRecipes;
+            Transform recipeText;
             Transform recipesContainer;
             List<ExpandedRecipe> expandedRecipes;
 
@@ -206,19 +277,32 @@ namespace ExpandRecipe
 			try
             {
                 var detailPanel = __instance.DetailPanel;
-                recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer");
+
+				recipeText = detailPanel.transform.Find("Scroll View/Viewport/Content/Recipes");
+				if(recipeText == null) {
+					MelonLogger.Error("Can't find Recipes object in current scene");
+					return;
+				}
+
+				recipesContainer = detailPanel.transform.Find("Scroll View/Viewport/Content/RecipesContainer");
                 if (recipesContainer == null)
                 {
                     MelonLogger.Error("Can't find RecipesContainer object in current scene");
                     return;
-                }
+				}
 
-                Transform existingExpandedRecipeEntry = recipesContainer.Find("ExpandedRecipe");
-                if (existingExpandedRecipeEntry != null)
+				Transform existingExpandedRecipesText = recipesContainer.Find("ExpandedRecipesText");
+				if(existingExpandedRecipesText != null) {
+					// Disable existing Extended Recipe(s) text
+					existingExpandedRecipesText.gameObject.SetActive(false);
+				}
+
+				Transform existingExpandedRecipes = recipesContainer.Find("ExpandedRecipes");
+                if (existingExpandedRecipes != null)
                 {
-                    // There's an existing entry - disable it
-                    existingExpandedRecipeEntry.gameObject.SetActive(false);
-                }
+					// There's existing recipes - disable it
+					existingExpandedRecipes.gameObject.SetActive(false);
+				}
             }
             catch (Exception ex)
             {
@@ -254,10 +338,6 @@ namespace ExpandRecipe
 					return;
 				}
 
-                foreach (ExpandedRecipe expandedRecipe in expandedRecipes) {
-					MelonLogger.Msg(expandedRecipe.ToString());
-				}
-
                 // Recipe with no ingredients, bail
                 if(expandedRecipes[0].addedIngredients.Count <= 0)
                 {
@@ -272,7 +352,7 @@ namespace ExpandRecipe
             // Actually update the UI
             try
             {
-                Main.BuildUIWithRecipe(expandedRecipes[0], recipesContainer.gameObject);
+                Main.BuildUIWithRecipe(expandedRecipes, recipeText.gameObject, recipesContainer.gameObject);
 
             } catch (Exception ex) {
                 MelonLogger.Error($"Exception raised building UI component: {ex}");

@@ -465,6 +465,7 @@
 	<ItemGroup>
 		<Compile Include="ExpandedRecipe.cs" />
 		<Compile Include="ExpandRecipe.cs" />
+		<Compile Include="GameObjectExtensions.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
