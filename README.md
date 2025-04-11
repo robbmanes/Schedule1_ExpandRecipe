@@ -15,7 +15,8 @@ Currently due to the recursive nature of needing to look up these recipes only a
 ## Source/Contributing
 This mod is published under the open source MIT license and all source code is available here:
 - ExpandRecipe GitHub (https://github.com/robbmanes/Schedule1_ExpandRecipe/)
-- The mod is available for download at NexusMods (https://www.nexusmods.com/schedule1/mods/453).
+- NexusMods (https://www.nexusmods.com/schedule1/mods/453)
+- Thunderstore (https://thunderstore.io/c/schedule-i/p/robbmanes/ExpandRecipe/)
 
 ## Reporting Issues
 This is my first mod ever, please be gentle with your reports.  I am a programmer but am very new to Unity, and wanted to try my hand at improving the Product Manager.  Feel free to either report issues within NexusMods or as an issue in the above GitHub link.
