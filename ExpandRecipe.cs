@@ -8,7 +8,7 @@ using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using UnityEngine;
 using UnityEngine.UI;
 
-[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.3", "Robb Manes", "https://github.com/robbmanes/Schedule1_ExpandRecipe")]
+[assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.2.0", "Robb Manes", "https://github.com/robbmanes/Schedule1_ExpandRecipe")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace ExpandRecipe
