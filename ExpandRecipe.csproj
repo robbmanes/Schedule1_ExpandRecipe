@@ -460,6 +460,8 @@
 	<PropertyGroup>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageProjectUrl>https://github.com/robbmanes/Schedule1_ExpandRecipe</PackageProjectUrl>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -469,6 +471,13 @@
 	<ItemGroup>
 	  <PackageReference Include="LavaGang.MelonLoader" Version="0.7.0" />
 	  <PackageReference Include="Lib.Harmony" Version="2.3.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
 	</ItemGroup>
 	
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
