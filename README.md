@@ -1,5 +1,6 @@
 # ExpandRecipe - Schedule 1
 A Product Manager recipe expansion mod for the game [Schedule 1](https://store.steampowered.com/app/3164500/Schedule_I/).
+**This mod only functions with the Il2cpp version of the game, not the Mono verison**.
 
 ## About
 When using the Product Manager App on your phone, instead of having to click on each product in succession to determine what mixers you need, this mod expands all of them at once including the base product you need (type of weed, meth, cocaine, etc).
@@ -22,5 +23,6 @@ This mod is published under the open source MIT license and all source code is a
 This is my first mod ever, please be gentle with your reports.  I am a programmer but am very new to Unity, and wanted to try my hand at improving the Product Manager.  Feel free to either report issues within NexusMods or as an issue in the above GitHub link.
 
 ## ToDo
-- Make the plus and arrow icons less ugly/sized properly (need to figure out how the spacing/sprite sizing is working).
-- Show additional recipes (without causing performance issues, within reason).
+- Make the arrow icons properly sized/not stretched and still fit within the horizontalLayoutGroup
+- Show and calculate costs of items including profit
+- Don't show the last recusion for base weed mixes (Grandaddy Purple + Flu Medicine = Grandaddy Purple)
