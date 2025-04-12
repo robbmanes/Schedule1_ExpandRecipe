@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using ExpandRecipe;
-using MelonLoader;
+﻿using MelonLoader;
 using Il2CppScheduleOne.UI.Phone.ProductManagerApp;
 using Il2CppScheduleOne.Product;
 using Il2CppScheduleOne.StationFramework;
@@ -9,9 +7,12 @@ using Object = UnityEngine.Object;
 using HarmonyPatch = HarmonyLib.HarmonyPatch;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq.Expressions;
-using Il2CppSteamworks;
-using Il2CppScheduleOne.UI;
+using Unity.Collections;
+using Il2CppNewtonsoft.Json.Utilities;
+using System.Linq;
+using UnityEngine.Playables;
+using UnityEngine.Timeline;
+using Il2CppToolBuddy.Pooling.Collections;
 
 [assembly: MelonInfo(typeof(ExpandRecipe.Main), "ExpandRecipe", "0.1.3", "Robb Manes", "https://github.com/robbmanes/Schedule1_ExpandRecipe")]
 [assembly: MelonGame("TVGS", "Schedule I")]
@@ -21,6 +22,7 @@ namespace ExpandRecipe
     public class Main : MelonMod
     {
         public string testedVersion = "0.3.4f4";
+        public static ProductManager productManager;
 
         private static readonly List<string> bottomProducts = [
             "Granddaddy Purple",
@@ -36,87 +38,185 @@ namespace ExpandRecipe
             MelonLogger.Msg($"Tested on Schedule I version \"{testedVersion}\"");
         }
 
-        public static List<StationRecipe.IngredientQuantity> GetExpandedRecipe(StationRecipe baseRecipe, ref ProductManager productManager, ref StationRecipe.IngredientQuantity baseProduct)
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
-            List<StationRecipe.IngredientQuantity> mixerSortedList = [];
-            List<StationRecipe.IngredientQuantity> expandedRecipe = [];
-
-            // Order our list to be base mixers first, always
-            // Not doing this causes out-of-order problems
-            // No List.OrderBy in IL2Cpp?
-            foreach (StationRecipe.IngredientQuantity sortIngredient in baseRecipe.Ingredients)
+            if (sceneName == "Main")
             {
-                if (sortIngredient.Item.Category == EItemCategory.Product)
+                // Make sure we can find the ProductManager
+                try
                 {
-                    mixerSortedList = mixerSortedList.Append(sortIngredient).ToList();
+                    productManager = Object.FindObjectsOfType<ProductManager>()[0];
                 }
-                else
+                catch (Exception ex)
                 {
-                    mixerSortedList = mixerSortedList.Prepend(sortIngredient).ToList();
+                    MelonLogger.Error($"Failed to find base Product Manager: {ex}");
                 }
             }
+            base.OnSceneWasLoaded(buildIndex, sceneName);
+        }
 
-            MelonLogger.Msg($"Recipe for \"{baseRecipe.Product.Item.name}\"");
-            foreach (StationRecipe.IngredientQuantity ingredient in mixerSortedList)
+        // ProductDefinition.Recipes contains a List<StationRecipe>
+        // Multiple recipe lists can exist for a single ProductDefinition
+        // Each StationRecipe contains a StationRecipe.IngredientQuantity
+        // Each IngredientQuantity needs to be evaluated as either a base ingredient or a product
+        // If it's a product, we need to recurse again
+
+        // Public method to present the lists
+        public static List<List<StationRecipe.IngredientQuantity>> GetExpandedRecipes(ProductEntry productEntry)
+        {
+            Il2CppSystem.Collections.Generic.List<StationRecipe> baseRecipes = productEntry.Definition.Recipes;
+            List<List<StationRecipe.IngredientQuantity>> retList = new();
+
+            retList = GetExpandedRecipesInternal(baseRecipes);
+
+            foreach (List<StationRecipe.IngredientQuantity> list in retList)
             {
-                MelonLogger.Msg($"\t{ingredient.Item.name}\"");
+                list.Reverse();
             }
 
-            foreach (StationRecipe.IngredientQuantity ingredient in mixerSortedList)
+            return retList;
+        }
+
+        // Take a starting productDefintion and return a properly ordered list of *all* possible recipes
+        // Each item in the returned list should be an ordered path to the same product
+        private static List<List<StationRecipe.IngredientQuantity>> GetExpandedRecipesInternal(Il2CppSystem.Collections.Generic.List<StationRecipe> baseRecipes)
+        {
+            // Unsure why this must be the case, check compatibility?
+            List<List<StationRecipe.IngredientQuantity>> retList = new();
+
+            // No recipes means we bail early
+            if (baseRecipes.Count > 0)
             {
-                // If one of our ingredients is a bottom-level product, make it the base and quit this cycle
-                if (bottomProducts.Contains(ingredient.Item.name))
+                foreach (StationRecipe recipe in baseRecipes)
                 {
-                    baseProduct = ingredient;
-                    continue;
-                }
-
-                // Our ingredient is a product that isn't a bottomProduct, we need to go deeper
-                if (ingredient.Item.Category == EItemCategory.Product)
-                {
-                    Func<ProductDefinition, bool> value = x => x.ID == ingredient.Item.ID;
-                    var product = productManager.AllProducts.Find(value) ?? throw new Exception($"Could not find base product for \"'{ingredient.Item.Name}'\"");
-
-                    // We hit a base product with no further recipes
-                    // This shouldn't happen if bottomProducts is up to date, but since it's possible we should check for it and log it appropriately
-                    if (product.Recipes.Count <= 0)
+                    // Order our list to be base mixers first, always
+                    // Not doing this causes out-of-order problems
+                    // No List.OrderBy in IL2Cpp?
+                    List<StationRecipe.IngredientQuantity> sortedIngredients = new List<StationRecipe.IngredientQuantity>();
+                    foreach (StationRecipe.IngredientQuantity ingredient in recipe.Ingredients)
                     {
-                        MelonLogger.Error($"Hit unknown base product \"{product.name}\" not in bottomProducts list, mod may need updating");
-                        baseProduct = ingredient;
-                        continue;
-                    }
-
-                    // Recursion safety check, make sure we're not in our product's own recipes (1 level down)
-                    foreach (StationRecipe nextRecipe in product.Recipes)
-                    {
-                        foreach (StationRecipe.IngredientQuantity nextIngredient in nextRecipe.Ingredients)
+                        if (ingredient.Item.Category == EItemCategory.Product)
                         {
-                            if (nextIngredient.Item.name == product.name) continue;
+                            sortedIngredients = sortedIngredients.Append(ingredient).ToList();
+                        }
+                        else
+                        {
+                            sortedIngredients = sortedIngredients.Prepend(ingredient).ToList();
                         }
                     }
 
-                    // We never want to return a list with a product in it, only ingredients, so recursively call ourselves on the new product
-                    // We blindly take the first recipe (for now) for performance/branch control reasons
-                    MelonLogger.Msg($"Deriving recipe for next product \"{product.name}\"");
-                    var recursiveList = GetExpandedRecipe(product.Recipes[0], ref productManager, ref baseProduct);
-
-                    // Append the entire recursive list if not empty
-                    if (recursiveList.Count > 0)
+                    // Once we're properly ordered, we can process ingredients
+                    foreach (StationRecipe.IngredientQuantity ingredient in sortedIngredients)
                     {
-                        expandedRecipe.AddRange(recursiveList);
+                        bool hitBottom = false;
+
+                        if (ingredient.Item.Category == EItemCategory.Product)
+                        {
+                            // We are a product, do a lookup
+                            Func<ProductDefinition, bool> value = x => x.ID == ingredient.Item.ID;
+                            var product = productManager.AllProducts.Find(value) ?? throw new Exception($"Could not find base product for \"'{ingredient.Item.Name}'\"");
+                            
+                            // Check if product has no recipes to iterate over
+                            if (product.Recipes.Count <= 0)
+                            {
+                                // We have to be the last on the stack, go back up one entry on the list
+                                // and add ourselves as the final product
+                                if (retList.Count > 0)
+                                {
+                                    if (retList[retList.Count - 1].Count > 0)
+                                    {
+                                        retList[retList.Count - 1] = retList[retList.Count - 1].Prepend(ingredient).ToList();
+                                    }
+                                }
+                                hitBottom = true;
+                                break;
+                            }
+
+                            // Check the upcoming product recipe for looping
+                            for (int i = 0; i < product.Recipes.Count; i++)
+                            {
+                                var checkRecipe = product.Recipes[i];
+                                foreach (StationRecipe.IngredientQuantity checkIngredient in checkRecipe.Ingredients)
+                                {
+                                    // Does our next recipe contain ourselves?
+                                    StationRecipe.IngredientQuantity lastIngredient = new();
+                                    if (checkRecipe.Ingredients.Contains(ingredient))
+                                    {
+                                        lastIngredient = checkIngredient;
+                                        // We're going to loop if we keep going, we've hit bottom
+                                        //
+                                        // This is a bit tricky because our last mixer is (always?) going to be the start
+                                        // of the loop.  We probably want to eventually clean this up but I haven't
+                                        // covered all of the corner cases yet.
+                                        //
+                                        // Add ourselves as the final base product overwriting the mixer and quit
+                                        if (retList.Count > 0)
+                                        {
+                                            if (retList[retList.Count - 1].Count > 0)
+                                            {
+                                                retList[retList.Count - 1] = retList[retList.Count - 1].Prepend(ingredient).ToList();
+                                            }
+                                        }
+                                        hitBottom = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // We've already hit bottom, stop the whole loop before we recurse again
+                            if (hitBottom) break;
+
+                            // Recurse into our new product and get its recipes
+                            var recursiveRecipes = GetExpandedRecipesInternal(product.Recipes);
+                            foreach (List<StationRecipe.IngredientQuantity> recursiveRecipe in recursiveRecipes)
+                            {
+                                // Add all previous mixers
+                                recursiveRecipe.AddRange(sortedIngredients);
+
+                                // Remove our intermediate product as we've been expanded to mixers
+                                recursiveRecipe.Remove(ingredient);
+
+                                // Add our sanitized list(s) onto the retList
+                                retList.Add(recursiveRecipe);
+                            }
+                        }
+                        else
+                        {
+                            List<StationRecipe.IngredientQuantity> ingredientList = new();
+                            ingredientList.Add(ingredient);
+                            retList.Add(ingredientList);
+                        }
                     }
                 }
-                // Add just the single ingredient to the list
-                else
+            }
+
+            // Prior to returning our list of lists, we want to remove subset lists that aren't complete recipes
+            foreach (List<StationRecipe.IngredientQuantity> listA in retList.ToList())
+            {
+                foreach (List<StationRecipe.IngredientQuantity> listB in retList.ToList())
                 {
-                    expandedRecipe.Add(ingredient);
-                    MelonLogger.Msg($"Added regular mixer \"{ingredient.Item.name}\"");
+                    if (listA == listB)
+                    {
+                        // This is our same list, skip this operation
+                        continue;
+                    }
+
+                    if (!listB.Except(listA).Any())
+                    {
+                        // Check if there are differences to avoid deleting a branching path
+                        if (listB.Except(listA).ToList().Count > 0)
+                        {
+                            // We're a unique branch, don't delete
+                            continue;
+                        }
+                        retList.Remove(listB);
+                    }
                 }
             }
-            return expandedRecipe;
+            return retList;
         }
 
-        public static void BuildUIWithRecipe(StationRecipe.ItemQuantity finalProduct, List<StationRecipe.IngredientQuantity> expandedRecipe, StationRecipe.IngredientQuantity baseProduct, GameObject recipesContainerUI)
+        public static void BuildUIWithRecipe(StationRecipe.IngredientQuantity finalProduct, List<StationRecipe.IngredientQuantity> expandedRecipe, StationRecipe.IngredientQuantity baseProduct, GameObject recipesContainerUI)
         {
             // Use these to clone instead of doing it by hand
             GameObject recipeToCloneUI = recipesContainerUI.transform.Find("Recipe").gameObject ?? throw new Exception("Unable to find recipeUI GameObject");
@@ -189,22 +289,9 @@ namespace ExpandRecipe
     {
         public static void Prefix(ProductManagerApp __instance, ProductEntry entry)
         {
-            ProductManager productManager;
-            StationRecipe baseRecipe;
             Transform recipesContainer;
-            List<StationRecipe.IngredientQuantity> expandedRecipe;
-            StationRecipe.IngredientQuantity baseProduct = new StationRecipe.IngredientQuantity();
+            List<List<StationRecipe.IngredientQuantity>> expandedRecipesList;
 
-            // Make sure we can find the ProductManager
-            try
-            {
-                productManager = Object.FindObjectsOfType<ProductManager>()[0];
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"Failed to find base Product Manager: {ex}");
-                return;
-            }
 
             // Set up the Phone UI
             // We have to do this early to clear existing ExpandedUI entries if they exist
@@ -231,59 +318,42 @@ namespace ExpandRecipe
                 return;
             }
 
-            // Fill the base recipe or determine if we're the base product
+            // Get a list of all recipes for a given base product
             try
             {
-                if (entry.Definition.Recipes.Count > 0)
+                expandedRecipesList = Main.GetExpandedRecipes(entry);
+
+                // Print the result to the console
+                foreach (List<StationRecipe.IngredientQuantity> recipe in expandedRecipesList)
                 {
-                    baseRecipe = entry.Definition.Recipes[0];
-                }
-                else
-                {
-                    // We must be a base product, bail
-                    return;
+                    string endProductName = entry.Definition.Name;
+                    string recipeString = "";
+                    foreach (StationRecipe.IngredientQuantity ingredient in recipe)
+                    {
+                        if (recipeString.Length > 0)
+                        {
+                            recipeString += " + ";
+                        }
+                        recipeString += $"{ingredient.Item.name}";
+                    }
+                    MelonLogger.Msg($"Expanded Recipe for \"{endProductName}\": {recipeString}");
                 }
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"Failed to find base definition: {ex}");
-                return;
-            }
-
-            // Get the recipe and base product
-            try
-            {
-                expandedRecipe = Main.GetExpandedRecipe(baseRecipe, ref productManager, ref baseProduct);
-                expandedRecipe.Reverse();
-
-                // Recipe with no ingredients, bail
-                if (expandedRecipe.Count <= 0)
-                {
-                    return;
-                }
-            } catch (Exception ex) {
-                MelonLogger.Error($"Exception raised getting recipe: {ex}");
+                MelonLogger.Error($"Failed to get expanded recipe list: {ex}");
                 return;
             }
 
             // Actually update the UI
             try
             {
-                Main.BuildUIWithRecipe(baseRecipe.Product, expandedRecipe, baseProduct, recipesContainer.gameObject);
+                Main.BuildUIWithRecipe(productEntry, expandedRecipes, recipesContainer.gameObject);
 
             } catch (Exception ex) {
                 MelonLogger.Error($"Exception raised building UI component: {ex}");
                 return;
             }
-
-            // Might as well print it to the Melon console
-            string recipeString = $"{baseProduct.Item.Name}";
-            foreach (StationRecipe.IngredientQuantity ingredient in expandedRecipe)
-            {
-                recipeString += " + ";
-                recipeString += $"{ingredient.Item.name}";
-            }
-            MelonLogger.Msg($"Expanded Recipe for \"{baseRecipe.Product.Item.Name}\": {recipeString}");
         }
     }
 }
