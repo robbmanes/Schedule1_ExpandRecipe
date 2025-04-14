@@ -462,6 +462,8 @@
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageProjectUrl>https://github.com/robbmanes/Schedule1_ExpandRecipe</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/robbmanes/Schedule1_ExpandRecipe</RepositoryUrl>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -479,8 +481,4 @@
 	    <PackagePath>\</PackagePath>
 	  </None>
 	</ItemGroup>
-	
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="COPY &quot;$(TargetPath)&quot; &quot;E:\SteamLibrary\steamapps\common\Schedule I\Mods&quot;" />
-	</Target>
 </Project>
