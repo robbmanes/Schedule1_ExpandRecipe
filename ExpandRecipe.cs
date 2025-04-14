@@ -120,10 +120,8 @@ namespace ExpandRecipe
                                 foreach (StationRecipe.IngredientQuantity checkIngredient in checkRecipe.Ingredients)
                                 {
                                     // Does our next recipe contain ourselves?
-                                    StationRecipe.IngredientQuantity lastIngredient = new();
                                     if (checkRecipe.Ingredients.Contains(ingredient))
                                     {
-                                        lastIngredient = checkIngredient;
                                         // We're going to loop if we keep going, we've hit bottom
                                         //
                                         // This is a bit tricky because our last mixer is (always?) going to be the start
